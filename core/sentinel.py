@@ -66,12 +66,14 @@ class AutoLagSentinel:
 
         with self._lock:
             # If the last incident is the same culprit within 60 seconds, update it rather than spamming new rows
-            if self.incidents and self.incidents[0]["culprit_name"] == culprit_name and (now - self.incidents[0]["timestamp"] < 60.0):
+            if (self.incidents and 
+                self.incidents[0].get("culprit_name") == culprit_name and 
+                (now - self.incidents[0].get("timestamp", now) < 60.0)):
                 self.incidents[0]["timestamp"] = now
                 self.incidents[0]["time_str"] = snapshot.get("time_str", time.strftime("%H:%M:%S"))
-                self.incidents[0]["peak_cpu"] = max(self.incidents[0]["peak_cpu"], cpu)
-                self.incidents[0]["peak_mem"] = max(self.incidents[0]["peak_mem"], mem)
-                self.incidents[0]["peak_disk_w"] = max(self.incidents[0]["peak_disk_w"], disk_w)
+                self.incidents[0]["peak_cpu"] = max(self.incidents[0].get("peak_cpu", 0.0), cpu)
+                self.incidents[0]["peak_mem"] = max(self.incidents[0].get("peak_mem", 0.0), mem)
+                self.incidents[0]["peak_disk_w"] = max(self.incidents[0].get("peak_disk_w", 0.0), disk_w)
                 self.incidents[0]["peak_ping"] = max(self.incidents[0].get("peak_ping", 0.0), ping_ms)
                 return self.incidents[0]
 

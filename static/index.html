@@ -371,16 +371,20 @@
               </p>
               <div class="conclusion-solutions" id="conclusionSolutions">
                 <div class="solution-item">
-                  <span class="sol-tag sol-rec">推薦步驟 1</span>
-                  <span><strong>等它掃描完畢（約 1~2 分鐘）：</strong>防毒查完之後，CPU 會自動降回 5%~10%，電腦就會恢復完全順暢。</span>
+                  <span class="sol-tag sol-rec">自然恢復 1</span>
+                  <span><strong>稍候 1~2 分鐘自動降溫：</strong>微軟防毒的背景維護完成後，CPU 負載會立刻自動降回 5%~10%，電腦重返順暢。</span>
+                </div>
+                <div class="solution-item" style="border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.08);">
+                  <span class="sol-tag sol-action">手動根治 2</span>
+                  <span style="line-height: 1.7;">
+                    <strong>使用【Ctrl + Alt + Del】工作管理員終止或降速：</strong><br>
+                    ① 按快捷鍵 <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Ctrl</kbd> + <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Alt</kbd> + <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Del</kbd> 叫出<strong>【工作管理員】</strong>。<br>
+                    ② 找到 <strong>Antimalware Service Executable</strong> 右鍵選擇<strong>【結束工作】</strong>或在詳細資料將優先順序設為「低」。
+                  </span>
                 </div>
                 <div class="solution-item">
-                  <span class="sol-tag sol-action">應急步驟 2</span>
-                  <span><strong>按右上角【一鍵急救減負 (R)】：</strong>強制釋放閒置記憶體，讓系統立刻騰出空間給其他軟體使用。</span>
-                </div>
-                <div class="solution-item">
-                  <span class="sol-tag sol-stop">立即止卡 3</span>
-                  <span><strong>若剛才有啟動微軟查毒：</strong>可點擊「防毒安全中心」分頁中的「中止掃描」按鈕，立即解除 CPU 佔用。</span>
+                  <span class="sol-tag sol-rec">一勞永逸 3</span>
+                  <span><strong>加入排除名單：</strong>前往「Windows 安全性」將專案目錄或 <code>python.exe</code> 加入排除，微軟防毒便永遠不會再次搶佔 CPU。</span>
                 </div>
               </div>
             </div>
@@ -759,6 +763,6 @@
     </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.6.0"></script>
 </body>
 </html>

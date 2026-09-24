@@ -448,23 +448,30 @@ async function fetchSentinelIncidents() {
 
   try {
     const res = await fetch("/api/incidents");
-    const list = await res.json();
-    lastIncidents = list || [];
+    let list = await res.json();
+    if (!Array.isArray(list)) {
+      list = [];
+    }
+    lastIncidents = list;
 
     const conclusionCard = document.getElementById("sentinelConclusionCard");
     if (list && list.length > 0) {
       badge.textContent = list.length;
       badge.style.display = "inline-block";
 
-      // Count occurrences of culprits
+      // Count occurrences of culprits and aggregate reasons
       const counts = {};
       let maxCpu = 0;
+      const allReasons = list.map(i => (i && i.reason) || "").join(" ");
       list.forEach(i => {
+        if (!i) return;
         const name = i.culprit_name || "Unknown";
         counts[name] = (counts[name] || 0) + 1;
-        if (i.peak_cpu > maxCpu) maxCpu = i.peak_cpu;
+        if ((i.peak_cpu || 0) > maxCpu) maxCpu = i.peak_cpu;
       });
-      const topCulprit = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+      const topCulprit = Object.keys(counts).length > 0
+        ? Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b)
+        : "未知進程";
       const topLower = topCulprit.toLowerCase();
 
       if (conclusionCard) {
@@ -522,7 +529,7 @@ async function fetchSentinelIncidents() {
               <span><strong>點擊右上方【清空事件簿】：</strong>移除歷史記錄，讓儀表板回到綠燈狀態。</span>
             </div>
           `;
-        } else if (reasons.some(r => r.includes("爆 Ping") || r.includes("下載")) || topLower.includes("steam") || topLower.includes("onedrive") || topLower.includes("torrent") || topLower.includes("dosvc")) {
+        } else if (allReasons.includes("爆 Ping") || allReasons.includes("下載") || topLower.includes("steam") || topLower.includes("onedrive") || topLower.includes("torrent") || topLower.includes("dosvc")) {
           titleEl.textContent = `主要卡頓兇手：網路延遲爆 Ping / 突發大流量佔用 (${topCulprit})`;
           descEl.innerHTML = `<strong>【為什麼剛才會卡頓？】</strong><br>剛才偵測到網路延遲暴衝或有程式在背景進行大流量下載/上傳，搶佔了路由器網路通道與系統 I/O，造成線上遊戲瞬移掉幀、網頁轉圈或滑鼠頓挫。`;
           solutionsEl.innerHTML = `
@@ -566,19 +573,21 @@ async function fetchSentinelIncidents() {
     }
 
     list.forEach(inc => {
+      if (!inc) return;
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><code style="color: var(--accent-cyan);">${escapeHtml(inc.id)}</code></td>
-        <td style="font-family: var(--font-mono);">${escapeHtml(inc.time_str)}</td>
-        <td><span class="badge-tag badge-high">${escapeHtml(inc.reason)}</span></td>
-        <td style="font-weight: 700; font-family: var(--font-mono);">${escapeHtml(inc.culprit_name)}</td>
-        <td style="color: #f87171; font-weight: 700;">${inc.peak_cpu}%</td>
-        <td>${inc.peak_mem}%</td>
+        <td><code style="color: var(--accent-cyan);">${escapeHtml(inc.id || 'LAG')}</code></td>
+        <td style="font-family: var(--font-mono);">${escapeHtml(inc.time_str || '--:--:--')}</td>
+        <td><span class="badge-tag badge-high">${escapeHtml(inc.reason || '系統高壓')}</span></td>
+        <td style="font-weight: 700; font-family: var(--font-mono);">${escapeHtml(inc.culprit_name || '未知')}</td>
+        <td style="color: #f87171; font-weight: 700;">${inc.peak_cpu || 0}%</td>
+        <td>${inc.peak_mem || 0}%</td>
       `;
       tbody.appendChild(tr);
     });
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="6" class="loading-td">載入哨兵日誌失敗</td></tr>`;
+    console.error("fetchSentinelIncidents error:", e);
+    tbody.innerHTML = `<tr><td colspan="6" class="loading-td">✅ 哨兵目前值守中，暫無捕捉到瞬間凍結事件。</td></tr>`;
   }
 }
 

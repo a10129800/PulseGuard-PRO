@@ -99,8 +99,12 @@ class DiagnosticHTTPHandler(SimpleHTTPRequestHandler):
                 items = startup_inspector.inspect()
                 self._send_json(items)
             elif path == "/api/incidents":
-                incidents = auto_sentinel.get_incidents()
-                self._send_json(incidents)
+                try:
+                    incidents = auto_sentinel.get_incidents()
+                    self._send_json(incidents)
+                except Exception as ex:
+                    traceback.print_exc()
+                    self._send_json([])
             elif path == "/api/deep_clean_scan":
                 scan_res = system_optimizer.scan_deep_clean()
                 self._send_json(scan_res)
