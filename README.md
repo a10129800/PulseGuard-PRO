@@ -31,6 +31,64 @@
 
 ---
 
+## 🗺️ 專案開發全景地圖 (Development & Architecture Map)
+
+### 1. 系統資料流與全景拓撲圖 (System Topology)
+
+```mermaid
+graph TD
+    subgraph OS_Layer [Windows 底層硬體與作業系統核心]
+        H1["CPU 12核心與多執行緒"]
+        H2["實體記憶體 & 分頁交換檔 (Commit)"]
+        H3["NVMe / SATA 磁碟 I/O"]
+        H4["GPU 顯卡溫度 & VRAM"]
+        H5["Anycast DNS 網路 Socket"]
+        H6["微軟防毒核心 (MpCmdRun / AMSI)"]
+    end
+
+    subgraph Collector_Layer [高頻採集與遙測層 Collectors]
+        C1["system_metrics: CPU/RAM/Disk"]
+        C2["gpu_metrics: 顯卡與溫控"]
+        C3["network_metrics: Ping與頻寬"]
+        C4["security_scanner: 特徵獵殺"]
+        C5["startup_inspector: 自啟動項"]
+        C6["health_checker: 0-100分評測"]
+    end
+
+    subgraph Core_Layer [黑盒子核心與智慧大腦 Core Engine]
+        B1[("60s 滾動飛行環 Ring Buffer")]
+        B2{"自動卡頓哨兵 Auto Sentinel"}
+        B3["頓挫黑盒子分析器 Lag Analyzer"]
+        B4["系統優化急救 EmptyWorkingSet"]
+    end
+
+    subgraph Delivery_Layer [終端呈現與互動層 Presentation]
+        UI1["主儀表板 Web UI (7 大分頁)"]
+        UI2["純透明置頂懸浮小圓球 Speed Ball"]
+        UI3["大白話診斷結論與 1-2-3 處方籤"]
+        UI4["HTML / Markdown 體檢報告匯出"]
+    end
+
+    OS_Layer --> Collector_Layer
+    Collector_Layer --> Core_Layer
+    Core_Layer --> Delivery_Layer
+```
+
+### 2. 功能模組演進路線圖 (Feature Roadmap)
+
+| 版本階段 | 里程碑主題 | 核心突破與功能演進 | 狀態 |
+| :--- | :--- | :--- | :---: |
+| **v1.0** | 🐣 **黑盒子雛形與遙測基石** | 60 秒滾動飛行緩衝環 (Ring Buffer)、高頻硬體遙測、純圓形透明置頂懸浮球 | `✅ 已完成` |
+| **v1.5** | 🤖 **自動哨兵與大白話診斷** | 瞬間卡頓自動拍照存證 (Sentinel)、防刷屏智能聚合、微軟防毒 780% CPU 暴衝排解指引 | `✅ 已完成` |
+| **v2.0** | 🛡️ **微軟原廠防毒與惡意獵殺** | 聯動微軟原生 `MpCmdRun.exe` 核心、偽裝 svchost 木馬獵殺、礦池特徵排查、Hosts 劫持體檢 | `✅ 已完成` |
+| **v2.5** | 🌐 **網路爆 Ping 與頻寬獵手** | 毫秒級無感 Socket RTT 延遲探針、即時上下行頻寬計算、60秒青色延遲動態波形流 | `✅ 已完成` |
+| **v3.0** | 🎮 **遊戲狂暴免打擾模式** | 一鍵掛起微軟更新與排程掃描、前台遊戲/軟體 CPU 優先權自動拉升、免打擾極速環境 | `🚧 規劃中` |
+| **v3.1** | 🌡️ **硬體縮缸與過熱降頻警報** | 捕捉 CPU PROCHOT 硬體降頻、筆記型電腦高溫降頻警報、散熱改善建議 | `🚧 規劃中` |
+| **v3.2** | 💾 **SSD S.M.A.R.T. 壽命守護** | NVMe / SATA 固態硬碟剩餘壽命百分比、總寫入量 (TBW) 監控與壞軌卡死提早預警 | `🚧 規劃中` |
+| **v3.3** | 🪟 **懸浮球懸停卡片 (Mini HUD)** | 滑鼠懸停展開毛玻璃資訊小卡（CPU/RAM/GPU溫/網速），移開自動縮回純圓球 | `🚧 規劃中` |
+
+---
+
 ## 🛠️ 架構設計與工程踩坑實錄 (Dev Log)
 
 ### 踩坑 1：不能為了解決卡頓，自己反而成了卡頓兇手（滾動飛行環 Ring Buffer）
@@ -59,13 +117,20 @@
   - 檢測連接 `stratum+tcp` 礦池協議或含有 `xmrig` 關鍵字的偷挖礦程式；
   - 即時審查系統 `hosts` 檔案是否遭到惡意劫持或重定向。
 
+### 踩坑 5：誰說卡頓一定是硬體？——網路爆 Ping 與偷跑頻寬獵手
+* **痛點**：很多時候電腦「卡」不是 CPU 滿載，而是線上遊戲突然爆 Ping 瞬移、通話破音或網頁轉圈，而背後往往是某個程式在偷偷霸佔頻寬。
+* **解法**：在 [`collectors/network_metrics.py`](file:///collectors/network_metrics.py) 設計了高頻無感 Socket RTT 握手遙測：
+  - 毫秒級精度追蹤連線延遲（Ping），並在 60 秒即時負載流繪製青色波形；
+  - 即時計算下載/上傳頻寬（MB/s），自動揪出誰在背後偷偷吃滿頻寬；
+  - 一旦延遲突破臨界值，自動哨兵立即拍照記錄並給予一鍵 FlushDNS 與排解處方！
+
 ---
 
 ## 🌟 核心特色模組全覽
 
 | 模組分頁 | 功能名稱 | 核心價值與解決的痛點 |
 | :--- | :--- | :--- |
-| **Tab 1: 即時監控** | 📊 **即時監控儀表 (Live Telemetry)** | 雙曲線即時波形流，監測 CPU 總體與 12 核心平行狀態、實體記憶體、Commit 虛擬記憶體、C 槽容量與 GPU 顯存/溫度。快捷鍵 <kbd>1</kbd>。 |
+| **Tab 1: 即時監控** | 📊 **即時監控儀表 (Live Telemetry)** | 雙曲線即時波形流，全方位監測 CPU 總體與 12 核心、實體 RAM、Commit、C 槽、GPU 溫控與**【網路延遲爆 Ping / 上下行頻寬獵手】**。快捷鍵 <kbd>1</kbd>。 |
 | **Tab 2: 黑盒子** | 🚨 **頓挫黑盒子分析 (Lag Hunter)** | 回溯過去 60 秒硬體高峰，秒抓是哪一個軟體突然暴衝吃光資源。快捷鍵 <kbd>Space</kbd> 隨時觸發。 |
 | **Tab 3: 自動哨兵** | 🤖 **自動卡頓哨兵 (Auto Sentinel)** | 背景自動值守，一旦出現凍結自動拍照存證；並附帶**大白話診斷結論與解決步驟**。快捷鍵 <kbd>3</kbd>。 |
 | **Tab 4: 垃圾清理** | 🧹 **深度快取清道夫 (Deep Cleaner)** | 掃描並清除 Windows Update 更新殘留包、Chrome/Edge 快取、縮圖快取與臨時暫存檔。快捷鍵 <kbd>4</kbd>。 |

@@ -21,3 +21,6 @@ RAM_PRESSURE_THRESHOLD = 85.0    # RAM percent considered high
 DISK_WRITE_SPIKE_MB = 50.0       # Disk write MB/s considered heavy burst
 DISK_FREE_WARNING_GB = 20.0      # C: drive minimum comfortable free space
 UPTIME_WARNING_HOURS = 72.0      # Continuous uptime warning threshold
+PING_SPIKE_THRESHOLD_MS = 160.0  # Ping latency ms considered lag spike
+NET_DOWNLOAD_SPIKE_MB = 20.0     # Download bandwidth MB/s considered network saturation
+

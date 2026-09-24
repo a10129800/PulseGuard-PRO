@@ -127,6 +127,8 @@ class PureDesktopFloatingBall:
         self._drag_start_y = 0
         self._has_moved = False
         self._is_optimizing = False
+        self.last_net_ping = None
+        self.last_net_status = "連線正常"
 
         # 事件綁定
         self.canvas.bind("<Button-1>", self.on_mouse_down)
@@ -197,6 +199,8 @@ class PureDesktopFloatingBall:
         menu.add_command(label="🚨 抓出剛才卡頓兇手", command=self.trigger_lag_hunter)
         menu.add_command(label="⚡ 立即急救減負 (釋放 RAM)", command=self.trigger_optimize)
         menu.add_command(label="🛡️ 微軟快速查毒 (Quick Scan)", command=self.trigger_quick_scan)
+        if self.last_net_ping is not None:
+            menu.add_command(label=f"🌐 網路延遲: {self.last_net_ping} ms ({self.last_net_status})", state="disabled")
         menu.add_separator()
         menu.add_command(label="❌ 關閉懸浮球", command=self.root.destroy)
         menu.tk_popup(event.x_root, event.y_root)
@@ -253,6 +257,10 @@ class PureDesktopFloatingBall:
                 mem = data.get("memory", {})
                 if "percent" in mem:
                     pct = int(mem["percent"])
+                net = data.get("network", {})
+                if net:
+                    self.last_net_ping = int(net.get("ping_ms", 0))
+                    self.last_net_status = net.get("status", "連線正常")
         except Exception:
             pass
 

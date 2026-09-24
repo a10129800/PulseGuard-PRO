@@ -9,6 +9,7 @@ import ctypes
 import subprocess
 from typing import Dict, Any, List
 from collectors.gpu_metrics import gpu_collector
+from collectors.network_metrics import network_collector
 
 # Try importing psutil for high-frequency low-overhead telemetry
 try:
@@ -211,6 +212,9 @@ class SystemMetricsCollector:
         # Query GPU (NVIDIA / Integrated)
         gpu_info = gpu_collector.collect()
 
+        # Query Network (Ping Latency, Up/Down Bandwidth, Active Sockets)
+        net_info = network_collector.collect()
+
         return {
             "timestamp": now,
             "time_str": time.strftime("%H:%M:%S", time.localtime(now)),
@@ -221,6 +225,7 @@ class SystemMetricsCollector:
             "disk": disk_data,
             "disk_c": self._get_c_drive_space(),
             "gpu": gpu_info,
+            "network": net_info,
             "top_processes": top_processes
         }
 

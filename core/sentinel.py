@@ -6,7 +6,10 @@ and saves blackbox incident snapshots into a persistent session log.
 import time
 import threading
 from typing import List, Dict, Any, Optional
-from core.config import CPU_SPIKE_THRESHOLD, RAM_PRESSURE_THRESHOLD, DISK_WRITE_SPIKE_MB
+from core.config import (
+    CPU_SPIKE_THRESHOLD, RAM_PRESSURE_THRESHOLD, DISK_WRITE_SPIKE_MB,
+    PING_SPIKE_THRESHOLD_MS, NET_DOWNLOAD_SPIKE_MB
+)
 
 class AutoLagSentinel:
     def __init__(self, max_incidents: int = 50, cooldown_sec: float = 12.0):
@@ -29,6 +32,9 @@ class AutoLagSentinel:
         cpu = snapshot.get("cpu_total", 0.0)
         mem = snapshot.get("memory", {}).get("percent", 0.0)
         disk_w = snapshot.get("disk", {}).get("write_mb_s", 0.0)
+        net_data = snapshot.get("network", {})
+        ping_ms = net_data.get("ping_ms", 0.0)
+        down_mb = net_data.get("download_mb_s", 0.0)
 
         trigger_reasons = []
         if cpu >= CPU_SPIKE_THRESHOLD:
@@ -37,6 +43,10 @@ class AutoLagSentinel:
             trigger_reasons.append(f"記憶體負載達 {mem}%")
         if disk_w >= DISK_WRITE_SPIKE_MB:
             trigger_reasons.append(f"磁碟大量寫入 {disk_w} MB/s")
+        if ping_ms >= PING_SPIKE_THRESHOLD_MS and ping_ms < 990.0:
+            trigger_reasons.append(f"網路爆 Ping 至 {ping_ms} ms")
+        if down_mb >= NET_DOWNLOAD_SPIKE_MB:
+            trigger_reasons.append(f"網路高載下載 {down_mb} MB/s")
 
         if not trigger_reasons:
             return None
@@ -44,7 +54,14 @@ class AutoLagSentinel:
         # Threshold breached! Check if this is the same ongoing culprit to avoid spam
         self.last_trigger_time = now
         top_procs = snapshot.get("top_processes", [])
-        top_culprit = top_procs[0] if top_procs else {"name": "未知進程", "cpu": cpu, "ram": 0.0}
+        net_procs = net_data.get("top_network_processes", [])
+        
+        # If triggered primarily by network and network processes exist
+        if (ping_ms >= PING_SPIKE_THRESHOLD_MS or down_mb >= NET_DOWNLOAD_SPIKE_MB) and net_procs and cpu < CPU_SPIKE_THRESHOLD:
+            top_culprit = {"name": net_procs[0]["name"], "cpu": cpu, "ram": 0.0, "net": f"{down_mb} MB/s"}
+        else:
+            top_culprit = top_procs[0] if top_procs else {"name": "未知進程", "cpu": cpu, "ram": 0.0}
+            
         culprit_name = top_culprit.get("name", "Unknown")
 
         with self._lock:
@@ -55,6 +72,7 @@ class AutoLagSentinel:
                 self.incidents[0]["peak_cpu"] = max(self.incidents[0]["peak_cpu"], cpu)
                 self.incidents[0]["peak_mem"] = max(self.incidents[0]["peak_mem"], mem)
                 self.incidents[0]["peak_disk_w"] = max(self.incidents[0]["peak_disk_w"], disk_w)
+                self.incidents[0]["peak_ping"] = max(self.incidents[0].get("peak_ping", 0.0), ping_ms)
                 return self.incidents[0]
 
             incident = {
@@ -65,6 +83,7 @@ class AutoLagSentinel:
                 "peak_cpu": cpu,
                 "peak_mem": mem,
                 "peak_disk_w": disk_w,
+                "peak_ping": ping_ms,
                 "culprit_name": culprit_name,
                 "culprit_cpu": top_culprit.get("cpu", 0.0),
                 "culprit_ram": top_culprit.get("ram", 0.0)

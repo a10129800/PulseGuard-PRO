@@ -169,8 +169,9 @@ function drawTimeline() {
     ctx.fill();
   }
 
-  plotSeries(d => d.memory ? d.memory.percent : 0, "#06b6d4", "rgba(6, 182, 212, 0.1)");
+  plotSeries(d => d.memory ? d.memory.percent : 0, "#a855f7", "rgba(168, 85, 247, 0.1)");
   plotSeries(d => d.cpu_total || 0, "#6366f1", "rgba(99, 102, 241, 0.18)");
+  plotSeries(d => d.network ? Math.min(100, ((d.network.ping_ms || 0) / 160) * 100) : 0, "#06b6d4", "rgba(6, 182, 212, 0.15)");
 }
 
 function getStatusColor(percent) {
@@ -246,6 +247,41 @@ async function fetchMetrics() {
       } else {
         tag.style.background = "rgba(16, 185, 129, 0.15)";
         tag.style.color = "#34d399";
+      }
+    }
+
+    // 5. Network Latency & Bandwidth (NEW)
+    if (data.network) {
+      const ping = Math.round(data.network.ping_ms || 0);
+      const pingEl = document.getElementById("netPingVal");
+      const tagEl = document.getElementById("netPingTag");
+      const barEl = document.getElementById("netPingBarFill");
+      const speedEl = document.getElementById("netSpeedDetail");
+
+      if (pingEl && tagEl && barEl && speedEl) {
+        pingEl.textContent = ping > 0 && ping < 990 ? ping : "--";
+        tagEl.textContent = data.network.status || "連線檢測中";
+        
+        const downMb = data.network.download_mb_s || 0;
+        const upMb = data.network.upload_mb_s || 0;
+        speedEl.textContent = `↓ ${downMb} MB/s | ↑ ${upMb} MB/s`;
+
+        if (ping >= 150 || data.network.packet_loss > 0) {
+          tagEl.style.background = "rgba(239, 68, 68, 0.2)";
+          tagEl.style.color = "#f87171";
+          barEl.style.background = "linear-gradient(90deg, #f59e0b, #ef4444)";
+          barEl.style.width = "100%";
+        } else if (ping >= 80) {
+          tagEl.style.background = "rgba(245, 158, 11, 0.2)";
+          tagEl.style.color = "#fbbf24";
+          barEl.style.background = "linear-gradient(90deg, #06b6d4, #f59e0b)";
+          barEl.style.width = "65%";
+        } else {
+          tagEl.style.background = "rgba(16, 185, 129, 0.15)";
+          tagEl.style.color = "#34d399";
+          barEl.style.background = "linear-gradient(90deg, #10b981, #06b6d4)";
+          barEl.style.width = `${Math.min(100, Math.max(12, (ping / 80) * 100))}%`;
+        }
       }
     }
 
@@ -484,6 +520,23 @@ async function fetchSentinelIncidents() {
             <div class="solution-item">
               <span class="sol-tag sol-action">清空日誌 2</span>
               <span><strong>點擊右上方【清空事件簿】：</strong>移除歷史記錄，讓儀表板回到綠燈狀態。</span>
+            </div>
+          `;
+        } else if (reasons.some(r => r.includes("爆 Ping") || r.includes("下載")) || topLower.includes("steam") || topLower.includes("onedrive") || topLower.includes("torrent") || topLower.includes("dosvc")) {
+          titleEl.textContent = `主要卡頓兇手：網路延遲爆 Ping / 突發大流量佔用 (${topCulprit})`;
+          descEl.innerHTML = `<strong>【為什麼剛才會卡頓？】</strong><br>剛才偵測到網路延遲暴衝或有程式在背景進行大流量下載/上傳，搶佔了路由器網路通道與系統 I/O，造成線上遊戲瞬移掉幀、網頁轉圈或滑鼠頓挫。`;
+          solutionsEl.innerHTML = `
+            <div class="solution-item">
+              <span class="sol-tag sol-rec">快速排解 1</span>
+              <span><strong>檢查背景下載：</strong>確認 Steam、OneDrive、BT 或瀏覽器是否有大檔案正在下載或同步，可將其暫停或限速。</span>
+            </div>
+            <div class="solution-item">
+              <span class="sol-tag sol-action">一鍵急救 2</span>
+              <span><strong>按右上角【一鍵急救減負 (R)】：</strong>立即自動執行 FlushDNS 刷新本機網路解析快取，重建流暢連線。</span>
+            </div>
+            <div class="solution-item">
+              <span class="sol-tag sol-rec">連線重置 3</span>
+              <span><strong>重啟路由器或連線：</strong>若仍持續爆 Ping，請嘗試重新連線 Wi-Fi 或插拔網路線以修復網路抖動。</span>
             </div>
           `;
         } else {

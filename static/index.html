@@ -224,6 +224,26 @@
               <span id="gpuNameDetail">偵測顯示卡硬體中...</span>
             </div>
           </div>
+
+          <!-- Network Latency & Bandwidth Card (NEW) -->
+          <div class="tele-card" id="cardNetwork">
+            <div class="tele-header">
+              <span class="tele-title">網路延遲與爆 Ping 獵手</span>
+              <span class="tele-tag" id="netPingTag">連線檢測中</span>
+            </div>
+            <div class="tele-body">
+              <div class="tele-val-wrap">
+                <span class="tele-val" id="netPingVal">--</span>
+                <span class="tele-unit">ms</span>
+              </div>
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" id="netPingBarFill" style="width: 0%; background: linear-gradient(90deg, #06b6d4, #3b82f6);"></div>
+              </div>
+            </div>
+            <div class="tele-footer">
+              <span id="netSpeedDetail">↓ 0.0 MB/s | ↑ 0.0 MB/s</span>
+            </div>
+          </div>
         </div>
 
         <!-- Realtime Continuous Waveform Graph -->
@@ -236,6 +256,7 @@
             <div class="chart-legend">
               <span class="legend-item"><span class="legend-dot dot-cpu"></span> CPU 負載 (%)</span>
               <span class="legend-item"><span class="legend-dot dot-ram"></span> 記憶體 (%)</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#06b6d4;"></span> Ping 延遲 (ms)</span>
             </div>
           </div>
           <div class="canvas-container">
