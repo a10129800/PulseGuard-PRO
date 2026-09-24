@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PulseGuard PRO - 電腦頓挫黑盒子與效能診斷系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ambient background glow layers -->
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="app-layout">
+    <!-- Top Bar -->
+    <header class="navbar">
+      <div class="nav-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>PulseGuard <span>PRO</span></h1>
+          <span class="sub-label">全方位頓挫黑盒子 • 哨兵自動抓兇手 • 深度清潔</span>
+        </div>
+      </div>
+
+      <!-- Quick Status Badges -->
+      <div class="header-badges">
+        <div class="engine-badge" id="engineStatusBadge">
+          <span class="dot pulse"></span>
+          <span id="engineStatusText">遙測就緒</span>
+        </div>
+        <div class="health-mini-pill" id="healthMiniBadge" title="全機健康度">
+          <span class="label">健康指數</span>
+          <span class="val" id="miniHealthScore">--</span>
+        </div>
+      </div>
+
+      <!-- Top CTA Action Buttons -->
+      <div class="nav-actions">
+        <!-- Circular Floating Speed Ball (Always on Top) -->
+        <button class="btn-action-outline" id="btnOpenHud" title="開啟桌面置頂懸浮小圓球 (Always on Top，切換視窗絕不縮小)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle></svg>
+          懸浮小圓球
+        </button>
+
+        <!-- Export Report Dropdown / Button -->
+        <button class="btn-action-outline" id="btnExportReport" title="一鍵匯出完整 HTML 系統診斷報告單">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          匯出報告
+        </button>
+
+        <!-- 1-Click Instant RAM & Temp Purge -->
+        <button class="btn-optimize-system" id="btnOptimizeSystem" title="立即強制清空處理程序工作集閒置記憶體、清理 %TEMP% 與刷新 DNS 快取 (R)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="opt-icon">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <div class="btn-text">
+            <strong>一鍵急救減負</strong>
+            <small>釋放 RAM (R)</small>
+          </div>
+        </button>
+
+        <!-- Emergency Lag Hunter CTA Button -->
+        <button class="btn-lag-hunter" id="btnTriggerLagHunter" title="剛才感到電腦卡頓或掉幀？點我立刻分析過去 60 秒兇手！ (Space)">
+          <span class="sonar-ring"></span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <div class="btn-text">
+            <strong>抓出卡頓兇手</strong>
+            <small>分析黑盒子 (Space)</small>
+          </div>
+        </button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-monitor">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        即時監控儀表
+      </button>
+      <button class="tab-btn" data-tab="tab-hunter" id="tabHunterBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+        頓挫黑盒子分析
+      </button>
+      <button class="tab-btn" data-tab="tab-sentinel" id="tabSentinelBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        自動哨兵日誌
+        <span class="tab-badge" id="incidentCountBadge" style="display:none;">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-cleaner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        深度垃圾清道夫
+      </button>
+      <button class="tab-btn" data-tab="tab-audit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+        全機深度體檢
+      </button>
+      <button class="tab-btn" data-tab="tab-startup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        常駐啟動清道夫
+      </button>
+      <button class="tab-btn" data-tab="tab-security" id="tabSecurityBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        防毒安全中心
+      </button>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="content-container">
+      
+      <!-- TAB 1: 即時監控 -->
+      <section class="tab-content active" id="tab-monitor">
+        <!-- Telemetry Cards Grid (5 Cards: CPU, RAM, Commit, Disk, GPU) -->
+        <div class="telemetry-grid">
+          <!-- CPU Card -->
+          <div class="tele-card" id="cardCpu">
+            <div class="tele-header">
+              <span class="tele-title">CPU 總體負載</span>
+              <span class="tele-trend" id="cpuTrend">即時</span>
+            </div>
+            <div class="tele-body">
+              <div class="tele-val-wrap">
+                <span class="tele-val" id="cpuVal">0</span>
+                <span class="tele-unit">%</span>
+              </div>
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" id="cpuBarFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="tele-footer">
+              <span id="cpuCoreInfo">核心遙測運作中</span>
+            </div>
+          </div>
+
+          <!-- RAM Card -->
+          <div class="tele-card" id="cardRam">
+            <div class="tele-header">
+              <span class="tele-title">實體記憶體 (RAM)</span>
+              <span class="tele-trend" id="ramTrend">即時</span>
+            </div>
+            <div class="tele-body">
+              <div class="tele-val-wrap">
+                <span class="tele-val" id="ramVal">0</span>
+                <span class="tele-unit">%</span>
+              </div>
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" id="ramBarFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="tele-footer">
+              <span id="ramUsageDetail">0.0 / 0.0 GB</span>
+            </div>
+          </div>
+
+          <!-- Commit / Virtual Memory Card -->
+          <div class="tele-card" id="cardCommit">
+            <div class="tele-header">
+              <span class="tele-title">虛擬記憶體 (Commit)</span>
+              <span class="tele-tag" title="若過高代表分頁檔交換頻繁，引起凍結">關鍵指標</span>
+            </div>
+            <div class="tele-body">
+              <div class="tele-val-wrap">
+                <span class="tele-val" id="commitVal">0</span>
+                <span class="tele-unit">%</span>
+              </div>
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" id="commitBarFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="tele-footer">
+              <span id="commitUsageDetail">已認可 -- GB</span>
+            </div>
+          </div>
+
+          <!-- Disk Activity Card -->
+          <div class="tele-card" id="cardDisk">
+            <div class="tele-header">
+              <span class="tele-title">磁碟 I/O 活躍度</span>
+              <span class="tele-trend" id="diskTrend">C: 磁碟槽</span>
+            </div>
+            <div class="tele-body">
+              <div class="tele-val-wrap">
+                <span class="tele-val" id="diskVal">0</span>
+                <span class="tele-unit">MB/s</span>
+              </div>
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" id="diskBarFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="tele-footer">
+              <span id="diskRwDetail">讀取: 0 MB/s | 寫入: 0 MB/s</span>
+            </div>
+          </div>
+
+          <!-- GPU & Thermal Card (NEW) -->
+          <div class="tele-card" id="cardGpu">
+            <div class="tele-header">
+              <span class="tele-title">GPU 顯卡與溫控</span>
+              <span class="tele-tag" id="gpuThermalTag">正常</span>
+            </div>
+            <div class="tele-body">
+              <div class="tele-val-wrap">
+                <span class="tele-val" id="gpuTempVal">--</span>
+                <span class="tele-unit">°C</span>
+              </div>
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" id="gpuBarFill" style="width: 0%; background: linear-gradient(90deg, #10b981, #f59e0b);"></div>
+              </div>
+            </div>
+            <div class="tele-footer">
+              <span id="gpuNameDetail">偵測顯示卡硬體中...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Realtime Continuous Waveform Graph -->
+        <div class="glass-panel chart-panel">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2>60 秒即時負載流 (Continuous Flight Timeline)</h2>
+              <span class="panel-subtitle">即時紀錄 CPU 與記憶體起伏，任何瞬間跳升均被捕捉</span>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot dot-cpu"></span> CPU 負載 (%)</span>
+              <span class="legend-item"><span class="legend-dot dot-ram"></span> 記憶體 (%)</span>
+            </div>
+          </div>
+          <div class="canvas-container">
+            <canvas id="liveTimelineCanvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Top Active Processes Table -->
+        <div class="glass-panel process-panel">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2>目前活躍進程列表 (Active Top Processes)</h2>
+              <span class="panel-subtitle">系統每秒排序消耗最高資源之行程</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>PID</th>
+                  <th>行程名稱 (Process)</th>
+                  <th>CPU 使用率</th>
+                  <th>RAM 佔比</th>
+                  <th>行為特徵標籤</th>
+                </tr>
+              </thead>
+              <tbody id="topProcessesTbody">
+                <tr>
+                  <td colspan="5" class="loading-td">正在載入行程遙測中...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: 頓挫黑盒子 (Lag Hunter) -->
+      <section class="tab-content" id="tab-hunter">
+        <div class="glass-panel hunter-main-panel">
+          <div class="hunter-hero">
+            <div class="hero-badge">Flight Recorder Analysis</div>
+            <h2>剛才究竟是誰在卡？ (Lag Culprit Diagnostic)</h2>
+            <p id="hunterSummaryText" class="hunter-summary">
+              點擊上方「抓出卡頓兇手」按鈕（或按 Space），系統將回溯過去 60 秒的硬體黑盒子紀錄，精準指出峰值秒數與主要元兇。
+            </p>
+          </div>
+
+          <!-- Highlight Cards -->
+          <div class="hunter-stats-grid">
+            <div class="stat-card">
+              <span class="label">最嚴重卡頓時刻</span>
+              <span class="stat-num" id="worstTimeText">--:--:--</span>
+            </div>
+            <div class="stat-card">
+              <span class="label">過去 60s 最高 CPU 峰值</span>
+              <span class="stat-num" id="peakCpuText">-- %</span>
+            </div>
+            <div class="stat-card">
+              <span class="label">最高記憶體飽和度</span>
+              <span class="stat-num" id="peakMemText">-- %</span>
+            </div>
+            <div class="stat-card">
+              <span class="label">最大磁碟爆發寫入</span>
+              <span class="stat-num" id="peakDiskText">-- MB/s</span>
+            </div>
+          </div>
+
+          <!-- Culprit Process Breakdown -->
+          <div class="culprits-section">
+            <h3>🚨 嫌疑兇手榜單 (Top Suspects Impact Ranking)</h3>
+            <div id="culpritsList" class="culprits-list">
+              <div class="empty-state">
+                <span>尚未進行頓挫診斷，請按上方按鈕或按下鍵盤空白鍵觸發分析。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: 自動卡頓哨兵 (Auto Lag Sentinel) -->
+      <section class="tab-content" id="tab-sentinel">
+        <div class="glass-panel sentinel-panel">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2>自動卡頓哨兵事件簿 (Auto Lag Sentinel Incidents)</h2>
+              <span class="panel-subtitle">📸 提示：此表格為「黑盒子歷史存證相簿」，記錄剛才曾發生過的卡頓（照片不會自動消失）。處理完畢請點右上角「清空事件簿」即可歸零！</span>
+            </div>
+            <div style="display:flex; gap: 10px;">
+              <button class="btn-refresh-audit" id="btnRefreshIncidents">重新整理</button>
+              <button class="btn-refresh-audit" id="btnClearIncidents" style="color: #f87171;">清空事件簿</button>
+            </div>
+          </div>
+
+          <!-- Smart Conclusion & Solution Card -->
+          <div class="sentinel-conclusion-card" id="sentinelConclusionCard" style="display:none;">
+            <div class="conclusion-header">
+              <div class="conclusion-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+              </div>
+              <div class="conclusion-title-wrap">
+                <div class="conclusion-badge" id="conclusionBadge">🎯 哨兵綜合診斷結論</div>
+                <h3 id="conclusionTitle">主要卡頓兇手：微軟防毒 (MsMpEng.exe)</h3>
+              </div>
+            </div>
+            <div class="conclusion-body">
+              <p class="conclusion-desc" id="conclusionDesc">
+                <strong>【為什麼會卡？】</strong>微軟 Windows Defender 原生防毒程式正在全力掃描磁碟與檔案，把 CPU 運算能力吃到了 100%。這是防毒軟體在查毒時的正常現象，並不是電腦中毒！
+              </p>
+              <div class="conclusion-solutions" id="conclusionSolutions">
+                <div class="solution-item">
+                  <span class="sol-tag sol-rec">推薦步驟 1</span>
+                  <span><strong>等它掃描完畢（約 1~2 分鐘）：</strong>防毒查完之後，CPU 會自動降回 5%~10%，電腦就會恢復完全順暢。</span>
+                </div>
+                <div class="solution-item">
+                  <span class="sol-tag sol-action">應急步驟 2</span>
+                  <span><strong>按右上角【一鍵急救減負 (R)】：</strong>強制釋放閒置記憶體，讓系統立刻騰出空間給其他軟體使用。</span>
+                </div>
+                <div class="solution-item">
+                  <span class="sol-tag sol-stop">立即止卡 3</span>
+                  <span><strong>若剛才有啟動微軟查毒：</strong>可點擊「防毒安全中心」分頁中的「中止掃描」按鈕，立即解除 CPU 佔用。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>事件編號</th>
+                  <th>捕捉時刻</th>
+                  <th>觸發原因</th>
+                  <th>主要元兇行程</th>
+                  <th>峰值 CPU</th>
+                  <th>記憶體負載</th>
+                </tr>
+              </thead>
+              <tbody id="incidentsTbody">
+                <tr>
+                  <td colspan="6" class="loading-td">哨兵日誌載入中...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: 深度垃圾清道夫 (Deep Cleaner) -->
+      <section class="tab-content" id="tab-cleaner">
+        <div class="glass-panel cleaner-panel">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2>深度系統快取與垃圾清除 (Deep Cache Cleaner)</h2>
+              <span class="panel-subtitle">掃描 Windows Update 下載包、瀏覽器快取、檔案總管縮圖快取與暫存</span>
+            </div>
+            <button class="btn-optimize-system" id="btnExecuteDeepClean">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              一鍵深度清理
+            </button>
+          </div>
+
+          <div class="cleaner-summary-bar">
+            <span>預估可清理空間：<strong id="cleanerTotalMb" style="color: #34d399; font-size: 1.4rem;">--</strong> MB</span>
+          </div>
+
+          <div class="cleaner-grid" id="cleanerGrid">
+            <div class="loading-td">正在掃描系統垃圾快取中...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: 全機深度體檢 (Health Audit) -->
+      <section class="tab-content" id="tab-audit">
+        <div class="glass-panel audit-panel">
+          <div class="audit-header-wrap">
+            <div class="score-circle-wrap">
+              <div class="score-circle" id="healthScoreCircle">
+                <span class="score-val" id="auditScoreVal">--</span>
+                <span class="score-unit">/100</span>
+              </div>
+              <div class="score-desc">
+                <h3 id="auditGradeText">正在進行健康評測...</h3>
+                <p>依據磁碟剩餘空間、連續開機時間、記憶體負載與常駐項綜合評估</p>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-action-outline" id="btnExportAuditHtml">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                下載體檢報告
+              </button>
+              <button class="btn-refresh-audit" id="btnAuditRunOptimize">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                急救減負 (RAM)
+              </button>
+              <button class="btn-refresh-audit" id="btnRefreshAudit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                重新評測
+              </button>
+            </div>
+          </div>
+
+          <div class="audit-grid">
+            <!-- Metric 1: System Uptime -->
+            <div class="audit-item-card">
+              <div class="item-title">連續開機時間</div>
+              <div class="item-value" id="auditUptimeVal">-- 小時</div>
+              <div class="item-hint" id="auditUptimeHint">建議每 3~5 天重開機一次釋放鎖死核心記憶體。</div>
+            </div>
+            <!-- Metric 2: C Drive Space -->
+            <div class="audit-item-card">
+              <div class="item-title">系統槽 C: 可用空間</div>
+              <div class="item-value" id="auditDiskCVal">-- GB</div>
+              <div class="item-hint" id="auditDiskCHint">SSD 低於 20GB 會導致快取寫入劇烈降速。</div>
+            </div>
+            <!-- Metric 3: High Impact Startup -->
+            <div class="audit-item-card">
+              <div class="item-title">高負載開機啟動項</div>
+              <div class="item-value" id="auditStartupVal">-- 個</div>
+              <div class="item-hint">開機自動掛載的大型軟體會常駐背景佔據 CPU 執行緒。</div>
+            </div>
+          </div>
+
+          <!-- Deductions / Issues Detected -->
+          <div class="audit-issues-section">
+            <h3>⚠️ 檢測到的系統瓶頸扣分項</h3>
+            <ul class="issues-list" id="auditDeductionsList">
+              <li>載入檢測報告中...</li>
+            </ul>
+          </div>
+
+          <!-- Optimization Tips -->
+          <div class="audit-tips-section">
+            <h3>💡 專家優化改善建議</h3>
+            <ul class="tips-list" id="auditTipsList">
+              <li>暫無建議</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: 常駐啟動清道夫 (Startup Optimizer) -->
+      <section class="tab-content" id="tab-startup">
+        <div class="glass-panel startup-panel">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <h2>Windows 開機自啟動軟體檢測 (Startup Bloatware Inspector)</h2>
+              <span class="panel-subtitle">抓出偷偷隨 Windows 一起開機、在背景默默吃資源的程式</span>
+            </div>
+            <button class="btn-refresh-audit" id="btnRefreshStartup">重新掃描啟動項</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>軟體/啟動名稱</th>
+                  <th>效能影響級別</th>
+                  <th>註冊表位置</th>
+                  <th>啟動路徑 / 參數</th>
+                  <th>優化建議</th>
+                </tr>
+              </thead>
+              <tbody id="startupItemsTbody">
+                <tr>
+                  <td colspan="5" class="loading-td">掃描註冊表與開機排程中...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: 安全防毒中心 (Security Shield & Antivirus Center) -->
+      <section class="tab-content" id="tab-security">
+        <div class="glass-panel security-panel">
+          <div class="panel-header">
+            <div class="panel-title-wrap">
+              <div class="security-badge-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <polyline points="9 12 11 14 15 10"></polyline>
+                </svg>
+              </div>
+              <div>
+                <h2>微軟原生防護與惡意威脅獵殺中心 (Security & Antivirus Center)</h2>
+                <span class="panel-subtitle">Windows Defender 原生掃描核心 • 內建可疑偽裝與挖礦行程獵殺 • Hosts 防劫持體檢</span>
+              </div>
+            </div>
+            <div class="security-top-actions">
+              <button class="btn-refresh-audit" id="btnUpdateSignatures" title="連線微軟雲端更新防毒定義庫">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                更新病毒碼
+              </button>
+              <button class="btn-action-outline" id="btnStartFullScan" title="執行完整微軟深度掃描">
+                微軟完整掃描
+              </button>
+              <button class="btn-primary-action" id="btnStartQuickScan">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                微軟快速掃描
+              </button>
+            </div>
+          </div>
+
+          <!-- 4 Security Cards -->
+          <div class="security-cards-grid">
+            <!-- Card 1: Defender Status -->
+            <div class="sec-card" id="cardDefender">
+              <div class="sec-card-header">
+                <div class="sec-card-title">微軟原生防護狀態</div>
+                <span class="badge-tag badge-low" id="defenderRealtimeBadge">即時防護中</span>
+              </div>
+              <div class="sec-card-body">
+                <div class="sec-main-val" id="defenderEngineName">Windows Defender</div>
+                <div class="sec-detail-row">
+                  <span>病毒定義版本:</span>
+                  <strong id="defenderSigVersion">載入中...</strong>
+                </div>
+                <div class="sec-detail-row">
+                  <span>定義庫更新:</span>
+                  <span id="defenderSigUpdated">載入中...</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Security Score -->
+            <div class="sec-card" id="cardSecScore">
+              <div class="sec-card-header">
+                <div class="sec-card-title">系統安全防護指數</div>
+                <span class="badge-tag badge-low" id="securityGradeBadge">堅固防護</span>
+              </div>
+              <div class="sec-card-body">
+                <div class="sec-score-val-wrap">
+                  <span class="sec-score-num" id="securityScoreNum">--</span>
+                  <span class="sec-score-max">/100</span>
+                </div>
+                <div class="sec-detail-row">
+                  <span>防護評級:</span>
+                  <strong id="securityGradeText">分析安全狀態中...</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: Hosts & Network Shield -->
+            <div class="sec-card" id="cardHostsShield">
+              <div class="sec-card-header">
+                <div class="sec-card-title">網路與系統劫持防護</div>
+                <span class="badge-tag badge-low" id="hostsStatusBadge">無異常導向</span>
+              </div>
+              <div class="sec-card-body">
+                <div class="sec-detail-row">
+                  <span>Hosts 檔案狀態:</span>
+                  <strong id="hostsIntegrityText">檢測中...</strong>
+                </div>
+                <div class="sec-detail-row">
+                  <span>Windows 防火牆:</span>
+                  <strong id="firewallStatusText">檢測中...</strong>
+                </div>
+                <div class="sec-detail-row">
+                  <span>UAC 提權防護:</span>
+                  <strong id="uacStatusText">檢測中...</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 4: Memory Threat & Miner Hunter -->
+            <div class="sec-card" id="cardProcessShield">
+              <div class="sec-card-header">
+                <div class="sec-card-title">記憶體與挖礦威脅監控</div>
+                <span class="badge-tag badge-low" id="processThreatBadge">分析中</span>
+              </div>
+              <div class="sec-card-body">
+                <div class="sec-detail-row">
+                  <span>記憶體威脅行程:</span>
+                  <strong id="processThreatCount">0 個異常</strong>
+                </div>
+                <div class="sec-detail-row">
+                  <span>開機可疑腳本:</span>
+                  <span id="suspiciousStartupCount">0 個發現</span>
+                </div>
+                <div style="margin-top: 10px;">
+                  <button class="btn-sub-action" id="btnHuntProcessesNow">
+                    ⚡ 立即排查記憶體威脅
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scanning Progress & Terminal Box -->
+          <div class="scan-terminal-wrapper" id="scanTerminalWrapper" style="display:none;">
+            <div class="scan-progress-header">
+              <div class="scan-header-left">
+                <div class="scan-radar-spinner"></div>
+                <div>
+                  <h3 id="scanTitleText">Windows Defender 掃描進行中...</h3>
+                  <span id="scanStatusSubText">正在檢測核心記憶體、開機磁區與關鍵系統程式碼</span>
+                </div>
+              </div>
+              <div class="scan-header-right">
+                <span class="scan-pct-label" id="scanPctLabel">0%</span>
+                <button class="btn-cancel-scan" id="btnCancelScan">中止掃描</button>
+              </div>
+            </div>
+            <div class="scan-progress-track">
+              <div class="scan-progress-bar" id="scanProgressBar" style="width: 0%;"></div>
+            </div>
+            <div class="terminal-box" id="scanTerminalLogs">
+              <div class="log-line text-muted">[初始化中...] 等候防毒引擎輸出回應</div>
+            </div>
+          </div>
+
+          <!-- Section 1: Process Threat Hunter Table -->
+          <div class="threat-section-box">
+            <div class="section-sub-header">
+              <div class="section-sub-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+                <h3>可疑/偽裝系統檔與挖礦木馬排查結果 (Memory Threat Hunter)</h3>
+              </div>
+              <button class="btn-refresh-audit" id="btnRefreshProcessThreats">重新排查記憶體</button>
+            </div>
+            <div class="table-responsive">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>處理程序 (PID)</th>
+                    <th>威脅評級</th>
+                    <th>威脅類型</th>
+                    <th>分析診斷與原因</th>
+                    <th>執行檔路徑</th>
+                    <th>資源佔用</th>
+                    <th>安全處置</th>
+                  </tr>
+                </thead>
+                <tbody id="processThreatsTbody">
+                  <tr>
+                    <td colspan="7" class="loading-td">正在分析記憶體中運行的所有處理程序...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Section 2: Security Deductions & Single File Scan -->
+          <div class="audit-split-grid">
+            <div class="threat-section-box">
+              <div class="section-sub-header">
+                <div class="section-sub-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                  <h3>系統防護弱點與扣分項 (Security Deductions)</h3>
+                </div>
+              </div>
+              <ul class="issues-list" id="securityDeductionsList">
+                <li>分析系統安全配置中...</li>
+              </ul>
+            </div>
+
+            <!-- Single File On-Demand Inspection -->
+            <div class="threat-section-box">
+              <div class="section-sub-header">
+                <div class="section-sub-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  <h3>單一檔案快篩與特徵碼查驗 (File Hash & Scan)</h3>
+                </div>
+              </div>
+              <div class="file-inspect-form">
+                <input type="text" id="fileInspectInput" class="custom-input" placeholder="請輸入本機檔案完整路徑 (例如: C:\Windows\explorer.exe)">
+                <button class="btn-action-outline" id="btnInspectFile">
+                  特徵驗證 (Hash)
+                </button>
+                <button class="btn-primary-action" id="btnDefenderScanFile">
+                  微軟查毒
+                </button>
+              </div>
+              <div class="file-inspect-result" id="fileInspectResult" style="display:none;">
+                <div class="result-row"><span>檔案名稱:</span> <strong id="resFileName">--</strong></div>
+                <div class="result-row"><span>檔案大小:</span> <span id="resFileSize">--</span></div>
+                <div class="result-row"><span>數位簽章:</span> <span id="resFileSig">--</span></div>
+                <div class="result-row"><span>SHA-256 特徵碼:</span> <code id="resFileSha256">--</code></div>
+                <div class="result-row"><span>MD5 特徵碼:</span> <code id="resFileMd5">--</code></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-left">
+        <span>PulseGuard PRO Diagnostics Engine v2.0 • 本地運作保護隱私</span>
+      </div>
+      <div class="footer-right">
+        <span>快速鍵: 按 <kbd>Space</kbd> 捕捉卡頓 • 按 <kbd>R</kbd> 急救釋放 RAM • 按 <kbd>1</kbd> ~ <kbd>7</kbd> 切換分頁</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

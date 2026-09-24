@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>PulseGuard 懸浮加速球</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #090d16; /* Clean deep space background, never white! */
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Floating Ball Container */
+    .speed-ball {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #1e293b 0%, #0b0f19 80%);
+      border: 2px solid rgba(6, 182, 212, 0.6);
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.4), inset 0 0 15px rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+    }
+
+    .speed-ball:hover {
+      transform: scale(1.05);
+      border-color: #38bdf8;
+      box-shadow: 0 0 32px rgba(56, 189, 248, 0.7);
+    }
+
+    .speed-ball:active {
+      transform: scale(0.96);
+    }
+
+    /* Wave / Liquid inside the ball */
+    .wave-fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 50%;
+      background: linear-gradient(180deg, rgba(6, 182, 212, 0.5) 0%, rgba(99, 102, 241, 0.7) 100%);
+      border-radius: 0 0 50% 50%;
+      z-index: 1;
+      transition: height 0.6s ease, background 0.4s ease;
+      pointer-events: none;
+    }
+
+    .ball-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .label-metric {
+      font-size: 9px;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .val-percent {
+      font-family: 'Outfit', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1;
+      margin: 2px 0;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+    }
+
+    .sub-hint {
+      font-size: 8px;
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid #34d399;
+      animation: rippleAnim 0.7s linear forwards;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    @keyframes rippleAnim {
+      0% { width: 0; height: 0; opacity: 1; }
+      100% { width: 140px; height: 140px; opacity: 0; }
+    }
+
+    .btn-quick-hunter {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.85);
+      border: 1px solid #f87171;
+      color: #fff;
+      font-size: 9px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 4;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .btn-quick-hunter:hover {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+  </style>
+</head>
+<body>
+  <div class="speed-ball" id="speedBall" title="單擊：立即釋放 RAM 記憶體&#10;右上角紅點：觸發卡頓黑盒子抓兇手">
+    <div class="wave-fill" id="waveFill" style="height: 50%;"></div>
+    
+    <div class="btn-quick-hunter" id="btnQuickHunter" title="抓卡頓兇手">!</div>
+
+    <div class="ball-content">
+      <span class="label-metric" id="ballMetricLabel">RAM 記憶體</span>
+      <span class="val-percent" id="ballVal">--%</span>
+      <span class="sub-hint" id="ballSubHint">點擊減負</span>
+    </div>
+  </div>
+
+  <script>
+    const ball = document.getElementById("speedBall");
+    const wave = document.getElementById("waveFill");
+    const valEl = document.getElementById("ballVal");
+    const subHint = document.getElementById("ballSubHint");
+    const btnHunter = document.getElementById("btnQuickHunter");
+
+    let isOptimizing = false;
+
+    async function update() {
+      try {
+        const res = await fetch("/api/metrics");
+        const d = await res.json();
+        if (d.memory) {
+          const pct = Math.round(d.memory.percent || 0);
+          valEl.textContent = pct + "%";
+          wave.style.height = pct + "%";
+
+          if (pct > 85) {
+            wave.style.background = "linear-gradient(180deg, rgba(239, 68, 68, 0.6) 0%, rgba(185, 28, 28, 0.8) 100%)";
+            ball.style.borderColor = "rgba(239, 68, 68, 0.8)";
+            ball.style.boxShadow = "0 0 25px rgba(239, 68, 68, 0.5)";
+          } else if (pct > 65) {
+            wave.style.background = "linear-gradient(180deg, rgba(245, 158, 11, 0.5) 0%, rgba(217, 119, 6, 0.7) 100%)";
+            ball.style.borderColor = "rgba(245, 158, 11, 0.7)";
+            ball.style.boxShadow = "0 0 20px rgba(245, 158, 11, 0.4)";
+          } else {
+            wave.style.background = "linear-gradient(180deg, rgba(6, 182, 212, 0.45) 0%, rgba(16, 185, 129, 0.65) 100%)";
+            ball.style.borderColor = "rgba(6, 182, 212, 0.5)";
+            ball.style.boxShadow = "0 0 20px rgba(6, 182, 212, 0.35)";
+          }
+        }
+      } catch (e) {}
+    }
+    setInterval(update, 1000);
+    update();
+
+    ball.addEventListener("click", async (e) => {
+      if (e.target === btnHunter) return;
+      if (isOptimizing) return;
+      isOptimizing = true;
+
+      const r = document.createElement("div");
+      r.className = "ripple";
+      ball.appendChild(r);
+      setTimeout(() => r.remove(), 700);
+
+      subHint.textContent = "釋放中...";
+      try {
+        const res = await fetch("/api/optimize_system", { method: "POST" });
+        const d = await res.json();
+        subHint.textContent = `+${Math.round(d.ram_freed_mb || 0)}M!`;
+        setTimeout(() => { subHint.textContent = "點擊減負"; }, 2500);
+        update();
+      } catch (err) {
+        subHint.textContent = "失敗";
+        setTimeout(() => { subHint.textContent = "點擊減負"; }, 2000);
+      } finally {
+        isOptimizing = false;
+      }
+    });
+
+    btnHunter.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      btnHunter.style.background = "#fbbf24";
+      try {
+        await fetch("/api/diagnose_lag");
+        alert("🚨 已捕捉並分析過去 60 秒卡頓兇手！回到主視窗可查看排行榜。");
+      } catch (e) {}
+      btnHunter.style.background = "rgba(239, 68, 68, 0.85)";
+    });
+  </script>
+</body>
+</html>
