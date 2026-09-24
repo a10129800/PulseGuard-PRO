@@ -12,12 +12,21 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8899 ^| findstr LISTENING') 
     taskkill /f /pid %%a >nul 2>&1
 )
 
+set PYTHONUTF8=1
+set PYTHONIOENCODING=utf-8
+
 echo 正在檢查 Python 執行環境...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [錯誤] 找不到 Python！請確認已安裝 Python 並將其加入系統 PATH。
     pause
     exit /b
+)
+
+python -c "import psutil" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [提示] 正在安裝必要依賴套件 (psutil)...
+    pip install -r requirements.txt
 )
 
 echo 正在啟動 PulseGuard PRO 診斷與防毒伺服器...

@@ -44,7 +44,8 @@ class DiagnosticHTTPHandler(SimpleHTTPRequestHandler):
                 result = system_optimizer.run_optimization()
                 self._send_json(result)
             elif path == "/api/deep_clean":
-                result = system_optimizer.execute_deep_clean()
+                selected_keys = body.get("selected_keys") if isinstance(body, dict) else None
+                result = system_optimizer.execute_deep_clean(selected_keys=selected_keys)
                 self._send_json(result)
             elif path == "/api/incidents/clear":
                 auto_sentinel.clear()
@@ -84,7 +85,9 @@ class DiagnosticHTTPHandler(SimpleHTTPRequestHandler):
             query = urllib.parse.parse_qs(parsed.query)
 
             if path == "/api/metrics":
-                sample = metrics_collector.collect()
+                sample = default_recorder.get_latest()
+                if not sample:
+                    sample = metrics_collector.collect()
                 self._send_json(sample)
             elif path == "/api/history":
                 history = default_recorder.get_history()
@@ -164,5 +167,9 @@ class DiagnosticHTTPHandler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def log_message(self, format, *args):
-        if "/api/metrics" not in args[0]:
-            sys.stderr.write("%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(), format % args))
+        try:
+            msg = format % args
+            if "/api/metrics" not in msg:
+                sys.stderr.write("%s - - [%s] %s\n" % (self.address_string(), self.log_date_time_string(), msg))
+        except Exception:
+            pass

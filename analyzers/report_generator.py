@@ -3,6 +3,7 @@ Report Generator - Generates standalone executive HTML & Markdown health diagnos
 Protected with robust exception handling and fallback values.
 """
 
+import os
 import time
 import platform
 from typing import Dict, Any
@@ -93,6 +94,10 @@ class ReportGenerator:
         gpu = data["gpu"]
         startups = data["startups"]
         incidents = data["incidents"]
+        cpu_cores_list = metrics.get('cpu_cores') or []
+        cpu_core_count = len(cpu_cores_list) if cpu_cores_list else (os.cpu_count() or 1)
+        disk_c_data = metrics.get('disk_c') or {}
+        disk_c_pct = disk_c_data.get('percent') or disk_c_data.get('used_percent', 0)
 
         md = f"""# PulseGuard 系統效能與頓挫診斷體檢報告
 
@@ -107,10 +112,10 @@ class ReportGenerator:
 
 | 資源項目 | 規格 / 容量 | 目前使用率 | 狀態評估 |
 | :--- | :--- | :--- | :--- |
-| **CPU 處理器** | {len(metrics.get('cpu_cores', []))} 核心 | {metrics.get('cpu_total', 0)}% | {'負載正常' if metrics.get('cpu_total', 0) < 70 else '⚠️ 負載偏高'} |
+| **CPU 處理器** | {cpu_core_count} 核心 | {metrics.get('cpu_total', 0)}% | {'負載正常' if metrics.get('cpu_total', 0) < 70 else '⚠️ 負載偏高'} |
 | **實體記憶體 (RAM)** | {metrics.get('memory', {}).get('total_gb', 0)} GB | {metrics.get('memory', {}).get('percent', 0)}% ({metrics.get('memory', {}).get('used_gb', 0)} GB) | {'餘裕充足' if metrics.get('memory', {}).get('percent', 0) < 80 else '⚠️ 記憶體緊張'} |
 | **分頁檔認可 (Commit)** | {metrics.get('memory', {}).get('commit_total_gb', 0)} GB | {metrics.get('memory', {}).get('commit_percent', 0)}% | {'交換正常' if metrics.get('memory', {}).get('commit_percent', 0) < 85 else '🚨 逼近上限'} |
-| **系統 C: 槽空間** | {metrics.get('disk_c', {}).get('total_gb', 0)} GB | 剩餘 {metrics.get('disk_c', {}).get('free_gb', 0)} GB ({metrics.get('disk_c', {}).get('percent', 0)}% 已用) | {'空間良好' if metrics.get('disk_c', {}).get('free_gb', 0) > 30 else '⚠️ 空間不足'} |
+| **系統 C: 槽空間** | {disk_c_data.get('total_gb', 0)} GB | 剩餘 {disk_c_data.get('free_gb', 0)} GB ({disk_c_pct}% 已用) | {'空間良好' if disk_c_data.get('free_gb', 0) > 30 else '⚠️ 空間不足'} |
 | **顯示卡 (GPU)** | {gpu.get('name', '標準顯示卡')} | 溫度 {gpu.get('temperature_c', 0)}°C (VRAM: {gpu.get('vram_percent', 0)}%) | {gpu.get('thermal_status', '正常')} |
 
 ---

@@ -54,8 +54,16 @@ class NetworkMetricsCollector:
 
     def _latency_worker(self):
         """Continuous background socket RTT ping (sub-millisecond accuracy, zero subprocess overhead)"""
+        last_proc_check = 0.0
         while self._running:
             latency = self._probe_latency()
+            now = time.time()
+            if now - last_proc_check >= 3.5:
+                procs = self._get_top_network_processes()
+                with self._lock:
+                    self.top_network_processes = procs
+                last_proc_check = now
+
             with self._lock:
                 if latency is not None:
                     self.current_ping_ms = round(latency, 1)
@@ -73,7 +81,6 @@ class NetworkMetricsCollector:
                     self.current_packet_loss = 100
                     self.current_ping_status = "連線中斷 / 丟包"
 
-            # Check network active processes every 3 seconds
             time.sleep(1.2)
 
     def _probe_latency(self) -> Optional[float]:
@@ -135,14 +142,18 @@ class NetworkMetricsCollector:
             try:
                 net_io = psutil.net_io_counters()
                 if net_io:
-                    recv_diff = max(0, net_io.bytes_recv - self.last_bytes_recv)
-                    sent_diff = max(0, net_io.bytes_sent - self.last_bytes_sent)
+                    if self.last_bytes_recv == 0 and self.last_bytes_sent == 0:
+                        self.last_bytes_recv = net_io.bytes_recv
+                        self.last_bytes_sent = net_io.bytes_sent
+                    else:
+                        recv_diff = max(0, net_io.bytes_recv - self.last_bytes_recv)
+                        sent_diff = max(0, net_io.bytes_sent - self.last_bytes_sent)
 
-                    down_mb_s = round((recv_diff / elapsed) / (1024 * 1024), 2)
-                    up_mb_s = round((sent_diff / elapsed) / (1024 * 1024), 2)
+                        down_mb_s = round((recv_diff / elapsed) / (1024 * 1024), 2)
+                        up_mb_s = round((sent_diff / elapsed) / (1024 * 1024), 2)
 
-                    self.last_bytes_recv = net_io.bytes_recv
-                    self.last_bytes_sent = net_io.bytes_sent
+                        self.last_bytes_recv = net_io.bytes_recv
+                        self.last_bytes_sent = net_io.bytes_sent
             except Exception:
                 pass
 
@@ -150,13 +161,11 @@ class NetworkMetricsCollector:
         self.current_down_mb_s = down_mb_s
         self.current_up_mb_s = up_mb_s
 
-        # Periodically refresh network process list
-        net_procs = self._get_top_network_processes()
-
         with self._lock:
             ping_ms = self.current_ping_ms
             status = self.current_ping_status
             packet_loss = self.current_packet_loss
+            net_procs = list(self.top_network_processes)
 
         return {
             "ping_ms": ping_ms,

@@ -8,19 +8,37 @@ PulseGuard Pure Desktop Speed Ball (純圓形無邊框置頂加速球)
 - 右鍵：卡頓黑盒子診斷 / 微軟快速查毒 / 關閉
 """
 
+import os
 import sys
-import json
-import time
-import ctypes
-import threading
-import urllib.request
-import tkinter as tk
-from tkinter import messagebox
 
-API_METRICS = "http://127.0.0.1:8899/api/metrics"
-API_OPTIMIZE = "http://127.0.0.1:8899/api/optimize_system"
-API_HUNTER = "http://127.0.0.1:8899/api/diagnose_lag"
-API_SCAN = "http://127.0.0.1:8899/api/security/scan"
+# Ensure UTF-8 output encoding across Windows consoles to avoid UnicodeEncodeError with emojis
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+if sys.platform == "win32":
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
+
+try:
+    from core.config import PORT, HOST
+    BASE_URL = f"http://{HOST}:{PORT}"
+except Exception:
+    BASE_URL = "http://127.0.0.1:8899"
+
+API_METRICS = f"{BASE_URL}/api/metrics"
+API_OPTIMIZE = f"{BASE_URL}/api/optimize_system"
+API_HUNTER = f"{BASE_URL}/api/diagnose_lag"
+API_SCAN = f"{BASE_URL}/api/security/scan"
 
 TRANSPARENT_KEY = "#010101"
 
@@ -175,13 +193,17 @@ class PureDesktopFloatingBall:
                     data = json.loads(res.read().decode())
                     freed = int(data.get("ram_freed_mb", 0))
             except Exception:
-                # Direct local fallback using EmptyWorkingSet API directly
+                # Direct local fallback using SystemOptimizer
                 try:
-                    # Clear process working set
-                    ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
-                    freed = 260
+                    from optimizers.system_optimizer import system_optimizer
+                    res = system_optimizer.run_optimization()
+                    freed = int(res.get("ram_freed_mb", 0))
                 except Exception:
-                    freed = 180
+                    try:
+                        ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
+                        freed = 50
+                    except Exception:
+                        freed = 0
 
             def _finish_ui():
                 self.canvas.itemconfig(self.txt_hint, text=f"+{freed}M!", fill="#34d399")

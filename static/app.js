@@ -15,6 +15,8 @@ let lastMetrics = null;
 let lastAudit = null;
 let lastIncidents = [];
 let lastStartups = [];
+let lastSecurityAudit = null;
+let scanPollTimer = null;
 
 // Canvas setup
 const canvas = document.getElementById("liveTimelineCanvas");
@@ -491,7 +493,12 @@ async function fetchSentinelIncidents() {
             <div class="solution-item" style="border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.08);">
               <span class="sol-tag sol-action">手動根治 2</span>
               <span style="line-height: 1.7;">
-                <strong>使用【Ctrl + Alt + Del】工作管理員終止或降速：</strong><br>
+                <div style="margin-bottom: 8px;">
+                  <button class="btn-sub-action" onclick="forceStopDefenderScan()" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(239,68,68,0.35);">
+                    🚨 立即一鍵降速/叫停微軟防毒 (釋放 CPU)
+                  </button>
+                </div>
+                <strong>或使用【Ctrl + Alt + Del】工作管理員終止或降速：</strong><br>
                 ① 同時按下鍵盤快捷鍵 <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Ctrl</kbd> + <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Alt</kbd> + <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Del</kbd>（或直接按 <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Ctrl</kbd> + <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Shift</kbd> + <kbd style="background:#1e293b;padding:2px 6px;border-radius:4px;border:1px solid #475569;font-weight:bold;">Esc</kbd>）。<br>
                 ② 點選進入<strong>【工作管理員】</strong>。<br>
                 ③ 在「處理程序」列表中，點擊「CPU」欄位從大到小排序，找到佔用最高的 <strong>Antimalware Service Executable</strong> (或相應防毒軟體)。<br>
@@ -948,8 +955,6 @@ function switchTab(tabId) {
 // ========================================================
 // Security & Antivirus Center Logic
 // ========================================================
-let scanPollTimer = null;
-let lastSecurityAudit = null;
 
 async function fetchSecurityOverview() {
   try {
