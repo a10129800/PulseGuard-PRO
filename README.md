@@ -124,6 +124,16 @@ graph TD
   - 即時計算下載/上傳頻寬（MB/s），自動揪出誰在背後偷偷吃滿頻寬；
   - 一旦延遲突破臨界值，自動哨兵立即拍照記錄並給予一鍵 FlushDNS 與排解處方！
 
+### 踩坑 6：前端防崩哲學——歷史舊資料相容與瀏覽器快取破除 (Cache Busting)
+* **痛點**：在功能高速升級時（例如引入網路爆 Ping 與新欄位），使用者重新整理後偶爾會看見「載入哨兵日誌失敗」的錯誤。
+* **深層病因**：
+  1. **瀏覽器頑固的磁碟快取 (Disk Cache)**：Chrome 在普通重新整理時，經常依然讀取記憶體中快取的舊版 JS 腳本；
+  2. **歷史舊資料與新資料結構摩擦**：在架構升級前捕捉到的舊卡頓事件，缺少了新模組所需要的特定欄位，導致前端在遍歷時觸發型別或未定義錯誤。
+* **解法（四重端到端防禦）**：
+  - **版本戳記破快取 (Cache Busting)**：在 [`static/index.html`](file:///static/index.html) 引入腳本時加上版本查詢字串 `<script src="app.js?v=2.6.0"></script>`，強迫瀏覽器丟棄舊快取；
+  - **極致防禦性渲染 (Defensive Rendering)**：前端對所有外部傳入的 API 資料實施嚴格的 `Array.isArray()` 型別檢查與安全回退（`inc.reason || '系統高壓'`），即便歷史紀錄格式有差異也 100% 絕不崩潰；
+  - **後端安全降級 (Graceful Degradation)**：在 [`server/handlers.py`](file:///server/handlers.py) 與 [`core/sentinel.py`](file:///core/sentinel.py) 中全數採用 `.get()` 安全存取與例外兜底，確保端到端絕對穩定。
+
 ---
 
 ## 🌟 核心特色模組全覽
