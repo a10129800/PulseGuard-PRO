@@ -482,7 +482,9 @@ class SecurityScanner:
 
                     # 4. Check Hidden PowerShell / WScript execution with encoded base64 commands
                     if name in ["powershell.exe", "cmd.exe", "wscript.exe", "cscript.exe", "mshta.exe"]:
-                        if any(arg in cmdline for arg in ["-enc", "-encodedcommand", "downloadstring", "iex(new-object", "-windowstyle hidden"]):
+                        is_encoded_or_download = any(arg in cmdline for arg in ["-enc", "-encodedcommand", "downloadstring", "iex(new-object", "iex (new-object", "webclient.downloaddata"])
+                        is_stealth_hidden = "-windowstyle hidden" in cmdline and any(arg in cmdline for arg in ["-enc", "download", "iex", "bypass", "invoke-expression"])
+                        if is_encoded_or_download or is_stealth_hidden:
                             threats.append({
                                 "pid": pid,
                                 "name": info['name'],
@@ -540,8 +542,8 @@ class SecurityScanner:
     def kill_process(self, pid: int) -> Dict[str, Any]:
         """Force terminates a rogue process by PID"""
         try:
-            if pid <= 4:
-                return {"status": "error", "message": "不能終止系統核心保護行程！"}
+            if pid <= 4 or pid == os.getpid():
+                return {"status": "error", "message": "不能終止 PulseGuard 自身或系統核心保護行程！"}
 
             # Try taskkill first (handles elevated privileges if running as admin)
             proc = subprocess.run(
@@ -649,7 +651,7 @@ class SecurityScanner:
         return results
 
     def _check_hosts_file(self) -> Dict[str, Any]:
-        """Checks for suspicious mappings in C:\Windows\System32\drivers\etc\hosts"""
+        r"""Checks for suspicious mappings in C:\Windows\System32\drivers\etc\hosts"""
         hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
         result = {
             "exists": False,

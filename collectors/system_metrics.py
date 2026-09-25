@@ -32,17 +32,28 @@ class _MEMORYSTATUSEX(ctypes.Structure):
         ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
     ]
 
+import threading
+
 class SystemMetricsCollector:
     def __init__(self):
+        self._lock = threading.Lock()
         self.last_disk_sample = {
             "time": time.time(),
             "read_bytes": 0,
             "write_bytes": 0
         }
+        self._proc_cache: Dict[int, Any] = {}
         # Initialize psutil initial CPU sample if available
         if HAS_PSUTIL:
             try:
                 psutil.cpu_percent(interval=None)
+                # Prime process cache
+                for p in psutil.process_iter(['name']):
+                    try:
+                        p.cpu_percent(interval=None)
+                        self._proc_cache[p.pid] = p
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -101,113 +112,143 @@ class SystemMetricsCollector:
                 total_gb = round(total_bytes.value / (1024 ** 3), 1)
 
             used_percent = round(((total_gb - free_gb) / max(total_gb, 1)) * 100, 1)
-            return {"total_gb": total_gb, "free_gb": free_gb, "used_percent": used_percent}
+            return {"total_gb": total_gb, "free_gb": free_gb, "used_percent": used_percent, "percent": used_percent}
         except Exception:
-            return {"total_gb": 500.0, "free_gb": 100.0, "used_percent": 80.0}
+            return {"total_gb": 500.0, "free_gb": 100.0, "used_percent": 80.0, "percent": 80.0}
 
     def collect(self) -> Dict[str, Any]:
         """Take a unified snapshot of system telemetry"""
-        now = time.time()
-        cpu_total = 0.0
-        cpu_cores = []
-        mem_data = {}
-        disk_data = {"read_mb_s": 0.0, "write_mb_s": 0.0, "busy_percent": 0.0}
-        top_processes: List[Dict[str, Any]] = []
+        with self._lock:
+            now = time.time()
+            cpu_total = 0.0
+            cpu_cores = []
+            mem_data = {}
+            disk_data = {"read_mb_s": 0.0, "write_mb_s": 0.0, "busy_percent": 0.0}
+            top_processes: List[Dict[str, Any]] = []
 
-        if HAS_PSUTIL:
-            try:
-                # CPU
-                cpu_total = psutil.cpu_percent(interval=None)
-                cpu_cores = psutil.cpu_percent(interval=None, percpu=True)
+            if HAS_PSUTIL:
+                try:
+                    # CPU
+                    cpu_total = psutil.cpu_percent(interval=None)
+                    cpu_cores = psutil.cpu_percent(interval=None, percpu=True)
 
-                # Memory
-                vm = psutil.virtual_memory()
-                swap = psutil.swap_memory()
-                mem_data = {
-                    "total_gb": round(vm.total / (1024 ** 3), 2),
-                    "used_gb": round(vm.used / (1024 ** 3), 2),
-                    "available_gb": round(vm.available / (1024 ** 3), 2),
-                    "percent": vm.percent,
-                    "commit_total_gb": round((vm.total + swap.total) / (1024 ** 3), 2),
-                    "commit_used_gb": round((vm.used + swap.used) / (1024 ** 3), 2),
-                    "commit_percent": round(((vm.used + swap.used) / max((vm.total + swap.total), 1)) * 100, 1)
-                }
+                    # Memory
+                    vm = psutil.virtual_memory()
+                    swap = psutil.swap_memory()
+                    mem_data = {
+                        "total_gb": round(vm.total / (1024 ** 3), 2),
+                        "used_gb": round(vm.used / (1024 ** 3), 2),
+                        "available_gb": round(vm.available / (1024 ** 3), 2),
+                        "percent": vm.percent,
+                        "commit_total_gb": round((vm.total + swap.total) / (1024 ** 3), 2),
+                        "commit_used_gb": round((vm.used + swap.used) / (1024 ** 3), 2),
+                        "commit_percent": round(((vm.used + swap.used) / max((vm.total + swap.total), 1)) * 100, 1)
+                    }
 
-                # Disk IO
-                dio = psutil.disk_io_counters()
-                if dio:
-                    if self.last_disk_sample["write_bytes"] == 0 and self.last_disk_sample["read_bytes"] == 0:
-                        # First initial baseline calibration, avoid huge false delta
-                        self.last_disk_sample = {
-                            "time": now,
-                            "read_bytes": dio.read_bytes,
-                            "write_bytes": dio.write_bytes
-                        }
-                    else:
-                        elapsed = max(now - self.last_disk_sample["time"], 0.1)
-                        read_diff = max(0, dio.read_bytes - self.last_disk_sample["read_bytes"])
-                        write_diff = max(0, dio.write_bytes - self.last_disk_sample["write_bytes"])
-                        disk_data["read_mb_s"] = round(read_diff / (1024 * 1024 * elapsed), 2)
-                        disk_data["write_mb_s"] = round(write_diff / (1024 * 1024 * elapsed), 2)
-                        total_mb_s = disk_data["read_mb_s"] + disk_data["write_mb_s"]
-                        disk_data["busy_percent"] = min(100.0, round((total_mb_s / 150.0) * 100, 1))
+                    # Disk IO
+                    dio = psutil.disk_io_counters()
+                    if dio:
+                        if self.last_disk_sample["write_bytes"] == 0 and self.last_disk_sample["read_bytes"] == 0:
+                            # First initial baseline calibration, avoid huge false delta
+                            self.last_disk_sample = {
+                                "time": now,
+                                "read_bytes": dio.read_bytes,
+                                "write_bytes": dio.write_bytes
+                            }
+                        else:
+                            elapsed = max(now - self.last_disk_sample["time"], 0.1)
+                            read_diff = max(0, dio.read_bytes - self.last_disk_sample["read_bytes"])
+                            write_diff = max(0, dio.write_bytes - self.last_disk_sample["write_bytes"])
+                            disk_data["read_mb_s"] = round(read_diff / (1024 * 1024 * elapsed), 2)
+                            disk_data["write_mb_s"] = round(write_diff / (1024 * 1024 * elapsed), 2)
+                            total_mb_s = disk_data["read_mb_s"] + disk_data["write_mb_s"]
+                            disk_data["busy_percent"] = min(100.0, round((total_mb_s / 150.0) * 100, 1))
 
-                        self.last_disk_sample = {
-                            "time": now,
-                            "read_bytes": dio.read_bytes,
-                            "write_bytes": dio.write_bytes
-                        }
+                            self.last_disk_sample = {
+                                "time": now,
+                                "read_bytes": dio.read_bytes,
+                                "write_bytes": dio.write_bytes
+                            }
 
-                # Top processes
-                procs = []
-                for p in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
-                    try:
-                        info = p.info
-                        name = info['name'] or 'Unknown'
-                        if name.lower() in ('system idle process', 'idle'):
+                    # Top processes with cached Process objects for accurate cpu_percent
+                    current_pids = set(psutil.pids())
+                    dead_pids = set(self._proc_cache.keys()) - current_pids
+                    for pid in dead_pids:
+                        self._proc_cache.pop(pid, None)
+
+                    cpu_count = max(psutil.cpu_count() or 1, 1)
+                    procs_candidates = []
+                    for pid in current_pids:
+                        if pid == 0:
                             continue
-                        procs.append({
-                            "pid": info['pid'],
-                            "name": name,
-                            "cpu": round(info['cpu_percent'] or 0.0, 1),
-                            "ram": round(info['memory_percent'] or 0.0, 1)
-                        })
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        pass
+                        proc = self._proc_cache.get(pid)
+                        if proc is None:
+                            try:
+                                proc = psutil.Process(pid)
+                                proc.cpu_percent(interval=None)  # prime baseline
+                                self._proc_cache[pid] = proc
+                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                continue
+                        try:
+                            name = proc.name() or 'Unknown'
+                            if name.lower() in ('system idle process', 'idle'):
+                                continue
+                            raw_cpu = proc.cpu_percent(interval=None) or 0.0
+                            # Normalize CPU percent across total logical cores to match Task Manager
+                            norm_cpu = round(raw_cpu / cpu_count, 1)
+                            procs_candidates.append((proc, name, norm_cpu))
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass
 
-                procs.sort(key=lambda x: (x['cpu'], x['ram']), reverse=True)
-                top_processes = procs[:12]
-
-            except Exception:
-                pass
-
-        else:
-            # Fallback without psutil
-            mem_data = self._get_native_memory()
-
-            try:
-                cmd = "powershell -NoProfile -Command \"(Get-Counter '\\Processor(_Total)\\% Processor Time').CounterSamples.CookedValue\""
-                res = subprocess.check_output(cmd, shell=True, text=True, timeout=1.5)
-                val = float(res.strip().replace(',', '.'))
-                cpu_total = round(val, 1)
-            except Exception:
-                cpu_total = 12.0
-
-            try:
-                cmd = "powershell -NoProfile -Command \"Get-Process | Sort-Object CPU -Descending | Select-Object -First 8 -Property Id, ProcessName, CPU, WorkingSet\""
-                out = subprocess.check_output(cmd, shell=True, text=True, timeout=2.0)
-                lines = out.strip().splitlines()
-                for line in lines[3:]:
-                    parts = line.split()
-                    if len(parts) >= 4:
+                    procs_candidates.sort(key=lambda x: x[2], reverse=True)
+                    top_processes = []
+                    for p, name, c in procs_candidates[:15]:
+                        try:
+                            ram_pct = round(p.memory_percent() or 0.0, 1)
+                        except Exception:
+                            ram_pct = 0.0
                         top_processes.append({
-                            "pid": int(parts[0]) if parts[0].isdigit() else 0,
-                            "name": parts[1] + ".exe",
-                            "cpu": 0.0,
-                            "ram": round(float(parts[3]) / (1024 * 1024 * 1024), 2) if parts[3].isdigit() else 0.0
+                            "pid": p.pid,
+                            "name": name,
+                            "cpu": c,
+                            "ram": ram_pct
                         })
-            except Exception:
-                pass
+
+                except Exception:
+                    pass
+
+            else:
+                # Fallback without psutil
+                mem_data = self._get_native_memory()
+
+                try:
+                    cmd = "powershell -NoProfile -Command \"(Get-Counter '\\Processor(_Total)\\% Processor Time').CounterSamples.CookedValue\""
+                    res = subprocess.check_output(cmd, shell=True, text=True, timeout=1.5)
+                    val = float(res.strip().replace(',', '.'))
+                    cpu_total = round(val, 1)
+                except Exception:
+                    cpu_total = 12.0
+
+                try:
+                    cmd = "powershell -NoProfile -Command \"Get-Process | Sort-Object CPU -Descending | Select-Object -First 10 -Property Id, ProcessName, CPU, WorkingSet\""
+                    out = subprocess.check_output(cmd, shell=True, text=True, timeout=2.0)
+                    lines = [l for l in out.strip().splitlines() if l.strip()]
+                    tot_phys = mem_data.get("total_gb", 16.0) * (1024 ** 3)
+                    for line in lines:
+                        parts = line.split()
+                        if len(parts) >= 4 and parts[0].isdigit():
+                            p_name = parts[1] + (".exe" if not parts[1].lower().endswith(".exe") else "")
+                            if p_name.lower() in ('idle.exe', 'system idle process.exe'):
+                                continue
+                            ws_bytes = float(parts[3]) if parts[3].isdigit() else 0.0
+                            top_processes.append({
+                                "pid": int(parts[0]),
+                                "name": p_name,
+                                "cpu": 0.0,
+                                "ram": round((ws_bytes / max(tot_phys, 1)) * 100, 1)
+                            })
+                except Exception:
+                    pass
 
         # Query GPU (NVIDIA / Integrated)
         gpu_info = gpu_collector.collect()

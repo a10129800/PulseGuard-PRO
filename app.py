@@ -8,6 +8,18 @@ import argparse
 from core.config import PORT, HOST
 from server import run_server
 
+# Ensure UTF-8 output encoding across Windows consoles to avoid UnicodeEncodeError with emojis
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 def main():
     parser = argparse.ArgumentParser(description="PulseGuard PC Lag Diagnostics & Flight Recorder")
     parser.add_argument("--port", type=int, default=PORT, help=f"HTTP Server port (default: {PORT})")

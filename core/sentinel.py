@@ -75,6 +75,11 @@ class AutoLagSentinel:
                 self.incidents[0]["peak_mem"] = max(self.incidents[0].get("peak_mem", 0.0), mem)
                 self.incidents[0]["peak_disk_w"] = max(self.incidents[0].get("peak_disk_w", 0.0), disk_w)
                 self.incidents[0]["peak_ping"] = max(self.incidents[0].get("peak_ping", 0.0), ping_ms)
+                self.incidents[0]["culprit_cpu"] = max(self.incidents[0].get("culprit_cpu", 0.0), top_culprit.get("cpu", 0.0))
+                self.incidents[0]["culprit_ram"] = max(self.incidents[0].get("culprit_ram", 0.0), top_culprit.get("ram", 0.0))
+                current_reasons = set(self.incidents[0].get("reason", "").split(" + "))
+                current_reasons.update(trigger_reasons)
+                self.incidents[0]["reason"] = " + ".join(sorted(current_reasons))
                 return self.incidents[0]
 
             incident = {

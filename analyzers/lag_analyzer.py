@@ -28,21 +28,21 @@ class LagAnalyzer:
             }
 
         # Extract telemetry series
-        cpu_values = [h.get("cpu_total", 0.0) for h in history]
-        peak_cpu = max(cpu_values)
-        avg_cpu = sum(cpu_values) / len(cpu_values)
+        cpu_values = [h.get("cpu_total", 0.0) or 0.0 for h in history]
+        peak_cpu = max(cpu_values) if cpu_values else 0.0
+        avg_cpu = sum(cpu_values) / max(len(cpu_values), 1)
 
-        mem_values = [h.get("memory", {}).get("percent", 0) for h in history]
-        peak_mem = max(mem_values)
+        mem_values = [((h.get("memory") or {}).get("percent") or 0.0) for h in history]
+        peak_mem = max(mem_values) if mem_values else 0.0
 
-        disk_writes = [h.get("disk", {}).get("write_mb_s", 0.0) for h in history]
-        peak_disk_write = max(disk_writes)
+        disk_writes = [((h.get("disk") or {}).get("write_mb_s") or 0.0) for h in history]
+        peak_disk_write = max(disk_writes) if disk_writes else 0.0
 
         # Find the snapshot with the highest composite stress
         def stress_score(s: Dict[str, Any]) -> float:
-            cpu = s.get("cpu_total", 0.0)
-            mem = s.get("memory", {}).get("percent", 0.0)
-            disk_w = s.get("disk", {}).get("write_mb_s", 0.0)
+            cpu = s.get("cpu_total", 0.0) or 0.0
+            mem = (s.get("memory") or {}).get("percent", 0.0) or 0.0
+            disk_w = (s.get("disk") or {}).get("write_mb_s", 0.0) or 0.0
             return (cpu * 0.5) + (min(disk_w, 100) * 0.3) + (mem * 0.2)
 
         worst_snapshot = max(history, key=stress_score)
@@ -56,10 +56,14 @@ class LagAnalyzer:
         for h in history:
             for p in h.get("top_processes", []):
                 name = p.get("name", "Unknown")
+                if not name or name.lower() in ('system idle process', 'idle'):
+                    continue
+                p_cpu = float(p.get("cpu") or 0.0)
+                p_ram = float(p.get("ram") or 0.0)
                 process_impact[name]["name"] = name
-                process_impact[name]["cpu_sum"] += p.get("cpu", 0.0)
-                process_impact[name]["max_cpu"] = max(process_impact[name]["max_cpu"], p.get("cpu", 0.0))
-                process_impact[name]["max_ram"] = max(process_impact[name]["max_ram"], p.get("ram", 0.0))
+                process_impact[name]["cpu_sum"] += p_cpu
+                process_impact[name]["max_cpu"] = max(process_impact[name]["max_cpu"], p_cpu)
+                process_impact[name]["max_ram"] = max(process_impact[name]["max_ram"], p_ram)
                 process_impact[name]["occurrences"] += 1
 
         culprits = []

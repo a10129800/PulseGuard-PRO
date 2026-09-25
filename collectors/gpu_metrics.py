@@ -8,9 +8,13 @@ import subprocess
 import shutil
 from typing import Dict, Any, Optional
 
+import time
+
 class GPUMetricsCollector:
     def __init__(self):
         self.has_nvidia_smi = shutil.which("nvidia-smi") is not None
+        self._cached_generic_gpu = None
+        self._cached_generic_time = 0.0
 
     def collect(self) -> Dict[str, Any]:
         """Collect GPU usage, VRAM, and temperature"""
@@ -19,8 +23,15 @@ class GPUMetricsCollector:
             if nvidia_data:
                 return nvidia_data
 
-        # Fallback to Windows WMI / DirectX
-        return self._collect_generic_wmi()
+        # Fallback to Windows WMI / DirectX with 60s caching to prevent PowerShell overhead
+        now = time.time()
+        if self._cached_generic_gpu and (now - self._cached_generic_time < 60.0):
+            return self._cached_generic_gpu
+
+        generic_data = self._collect_generic_wmi()
+        self._cached_generic_gpu = generic_data
+        self._cached_generic_time = now
+        return generic_data
 
     def _collect_nvidia(self) -> Optional[Dict[str, Any]]:
         """Query NVIDIA GPU using nvidia-smi with CSV output"""

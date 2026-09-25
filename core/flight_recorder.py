@@ -22,6 +22,11 @@ class FlightRecorder:
         with self._lock:
             return list(self._buffer)
 
+    def get_latest(self) -> Optional[Dict[str, Any]]:
+        """Retrieve the most recent telemetry snapshot or None if buffer is empty"""
+        with self._lock:
+            return dict(self._buffer[-1]) if self._buffer else None
+
     def count(self) -> int:
         with self._lock:
             return len(self._buffer)
